@@ -1,0 +1,5 @@
+numpy>=1.24
+matplotlib>=3.7
+gymnasium[classic-control]>=0.29
+pygad>=3.3
+imageio[ffmpeg]
