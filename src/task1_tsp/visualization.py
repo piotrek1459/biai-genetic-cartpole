@@ -4,28 +4,53 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def plot_fitness_history(history_best, history_avg, save_path):
+def plot_fitness_history(history_best, history_avg, save_path,
+                         epsilon=1e-6, stagnation_events=None):
     """
-    Plot best and average fitness over generations and save to file.
+    Plot best and average fitness over generations.
+
+    A secondary y-axis on the right shows the corresponding route distance,
+    making the chart interpretable without knowing the fitness formula.
+    Stagnation-triggered adaptive boost events are marked as vertical lines.
 
     Parameters
     ----------
-    history_best : list[float]
-    history_avg  : list[float]
-    save_path    : str
+    history_best      : list[float]
+    history_avg       : list[float]
+    save_path         : str
+    epsilon           : float  – the ε used in fitness = 1/(d+ε); needed to
+                                 recover distance from fitness for the right axis
+    stagnation_events : list[int] | None  – generation indices where boost fired
     """
-    fig, ax = plt.subplots(figsize=(9, 5))
+    fig, ax1 = plt.subplots(figsize=(9, 5))
     generations = range(len(history_best))
 
-    ax.plot(generations, history_best, label="Best fitness", linewidth=2, color="#2563eb")
-    ax.plot(generations, history_avg,  label="Avg fitness",  linewidth=1.5,
-            color="#f59e0b", linestyle="--", alpha=0.85)
+    ax1.plot(generations, history_best, label="Best fitness", linewidth=2, color="#2563eb")
+    ax1.plot(generations, history_avg,  label="Avg fitness",  linewidth=1.5,
+             color="#f59e0b", linestyle="--", alpha=0.85)
+    ax1.set_xlabel("Generation")
+    ax1.set_ylabel("Fitness  (1 / distance)", color="#2563eb")
+    ax1.tick_params(axis="y", labelcolor="#2563eb")
 
-    ax.set_xlabel("Generation")
-    ax.set_ylabel("Fitness  (1 / distance)")
-    ax.set_title("TSP – Fitness over Generations")
-    ax.legend()
-    ax.grid(True, alpha=0.3)
+    # right axis: route distance derived from best fitness
+    ax2 = ax1.twinx()
+    best_distances = [1.0 / max(f, 1e-12) - epsilon for f in history_best]
+    ax2.plot(generations, best_distances, linewidth=0)  # invisible — sets scale only
+    ax2.set_ylabel("Best route distance", color="#6b7280")
+    ax2.tick_params(axis="y", labelcolor="#6b7280")
+    # invert so that smaller distance = higher on right axis (matches fitness direction)
+    ax2.set_ylim(max(best_distances) * 1.05, min(best_distances) * 0.95)
+
+    # mark adaptive boost events
+    if stagnation_events:
+        for i, gen in enumerate(stagnation_events):
+            ax1.axvline(x=gen, color="#ef4444", alpha=0.35, linewidth=1.2,
+                        linestyle=":", label="Adaptive boost" if i == 0 else "")
+
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    ax1.legend(lines1, labels1, loc="lower right", fontsize=9)
+    ax1.set_title("TSP – Fitness & Route Distance over Generations")
+    ax1.grid(True, alpha=0.3)
 
     fig.tight_layout()
     fig.savefig(save_path, dpi=150)

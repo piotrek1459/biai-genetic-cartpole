@@ -33,20 +33,24 @@ class LinearPolicy:
 
 def evaluate_policy(weights, n_episodes=5, seed=None):
     """
-    Run the CartPole-v1 environment for n_episodes and return mean reward.
+    Run CartPole-v1 for n_episodes and return mean reward.
 
-    Creates and closes the environment internally so this function is
-    stateless and safe to call repeatedly from the fitness function.
+    Creates and closes the environment internally (stateless).
+    """
+    mean, _ = evaluate_policy_with_stats(weights, n_episodes=n_episodes, seed=seed)
+    return mean
 
-    Parameters
-    ----------
-    weights    : np.ndarray, shape (5,)
-    n_episodes : int   – number of episodes to average over
-    seed       : int | None  – passed to env.reset() for reproducibility
+
+def evaluate_policy_with_stats(weights, n_episodes=5, seed=None):
+    """
+    Run CartPole-v1 for n_episodes and return (mean_reward, std_reward).
+
+    The std captures performance stability across different initial states.
+    A policy with low std is more robust and reliable.
 
     Returns
     -------
-    float – mean total reward across n_episodes
+    (float, float) – mean and standard deviation of total rewards
     """
     policy = LinearPolicy(weights)
     env = gymnasium.make("CartPole-v1")
@@ -65,4 +69,5 @@ def evaluate_policy(weights, n_episodes=5, seed=None):
         rewards.append(total)
 
     env.close()
-    return float(np.mean(rewards))
+    arr = np.array(rewards)
+    return float(arr.mean()), float(arr.std())

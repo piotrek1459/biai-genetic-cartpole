@@ -20,6 +20,10 @@ CONFIG = {
     "seed": 42,
     "results_dir": "results/task1",
     "epsilon": 1e-6,
+    "smoothness_weight": 0.2,  # path balance bonus: 0 = disabled
+    "n_jobs": -1,              # parallel fitness evaluation (-1 = all threads)
+    "adaptive_mutation": True, # double-mutate when stuck
+    "adaptive_patience": 25,   # generations without improvement before boost
     "log_every": 50,
 }
 
@@ -42,10 +46,37 @@ def route_distance(cities, permutation):
     return dist
 
 
-def make_fitness_fn(cities, epsilon=1e-6):
-    """Return a fitness function: f(permutation) = 1 / (distance + epsilon)."""
+def route_smoothness(cities, permutation):
+    """
+    Compute a path-balance score in (0, 1].
+
+    Returns 1/(1+CV) where CV is the coefficient of variation of segment
+    lengths.  A perfectly uniform route (all segments equal) scores 1.0;
+    heavily imbalanced routes (zigzagging) score closer to 0.
+    """
+    ordered = cities[permutation]
+    loop = np.vstack([ordered, ordered[0]])
+    lengths = np.linalg.norm(np.diff(loop, axis=0), axis=1)
+    cv = lengths.std() / (lengths.mean() + 1e-9)
+    return 1.0 / (1.0 + cv)
+
+
+def make_fitness_fn(cities, epsilon=1e-6, smoothness_weight=0.0):
+    """
+    Return a combined fitness function:
+
+        f = (1 / (distance + ε)) * (1 + smoothness_weight * smoothness)
+
+    smoothness_weight=0 reduces to the plain distance-inverse fitness.
+    The smoothness bonus rewards routes with balanced segment lengths,
+    discouraging extreme zigzagging without conflicting with the main goal.
+    """
     def fitness_fn(permutation):
-        return 1.0 / (route_distance(cities, permutation) + epsilon)
+        dist = route_distance(cities, permutation)
+        base = 1.0 / (dist + epsilon)
+        if smoothness_weight > 0:
+            base *= 1.0 + smoothness_weight * route_smoothness(cities, permutation)
+        return base
     return fitness_fn
 
 
@@ -99,7 +130,7 @@ def run_tsp(config=None):
     cities = generate_cities(cfg["n_cities"], seed=cfg["seed"])
 
     init_fn = lambda c: init_population(c["pop_size"], c["n_cities"], rng)
-    fitness_fn = make_fitness_fn(cities, cfg["epsilon"])
+    fitness_fn = make_fitness_fn(cities, cfg["epsilon"], cfg.get("smoothness_weight", 0.0))
     crossover_fn = _make_crossover(cfg["crossover"])
     mutation_fn = _make_mutation(cfg["mutation"], cfg["mutation_rate"])
     selection_fn = _make_selection(cfg["selection"], cfg["tournament_k"])
@@ -125,7 +156,9 @@ def run_tsp(config=None):
     history_path = os.path.join(cfg["results_dir"], "fitness_history.png")
     route_path = os.path.join(cfg["results_dir"], "best_route.png")
 
-    plot_fitness_history(result["history_best"], result["history_avg"], history_path)
+    plot_fitness_history(result["history_best"], result["history_avg"], history_path,
+                         epsilon=cfg["epsilon"],
+                         stagnation_events=result.get("stagnation_events"))
     plot_best_route(cities, result["best"], best_dist, route_path)
 
     print(f"Plots saved to {cfg['results_dir']}/")

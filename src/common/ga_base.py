@@ -1,4 +1,5 @@
 import numpy as np
+from concurrent.futures import ThreadPoolExecutor
 
 
 class GeneticAlgorithm:
@@ -12,26 +13,20 @@ class GeneticAlgorithm:
     ----------
     config : dict
         Must contain:
-          pop_size      : int   – population size
-          n_generations : int   – number of generations to run
-          n_elite       : int   – number of best individuals preserved each generation
+          pop_size          : int   – population size
+          n_generations     : int   – number of generations to run
+          n_elite           : int   – number of best individuals preserved each generation
         Optional:
-          log_every     : int   – print progress every N generations (default 10)
+          log_every         : int   – print progress every N generations (default 10)
+          n_jobs            : int   – parallel fitness evaluations; 1=serial, -1=all cores
+          adaptive_mutation : bool  – double-apply mutation when fitness stagnates
+          adaptive_patience : int   – stagnation window before boost fires (default 20)
 
-    init_fn : callable (config) -> list[np.ndarray]
-        Returns the initial population.
-
-    fitness_fn : callable (individual: np.ndarray) -> float
-        Returns a scalar fitness value. Higher is always better.
-
-    crossover_fn : callable (p1, p2) -> (c1, c2)
-        Takes two parent arrays, returns two child arrays.
-
-    mutation_fn : callable (individual: np.ndarray) -> np.ndarray
-        Takes an individual, returns a (possibly mutated) copy.
-
-    selection_fn : callable (population, fitness, n_select) -> list[np.ndarray]
-        Returns n_select parent copies drawn from the population.
+    init_fn      : (config) -> list[np.ndarray]
+    fitness_fn   : (individual) -> float           higher is always better
+    crossover_fn : (p1, p2) -> (c1, c2)
+    mutation_fn  : (individual) -> np.ndarray
+    selection_fn : (population, fitness, n_select) -> list[np.ndarray]
     """
 
     def __init__(self, config, init_fn, fitness_fn, crossover_fn, mutation_fn, selection_fn):
@@ -53,50 +48,72 @@ class GeneticAlgorithm:
         Returns
         -------
         dict with keys:
-            best          : np.ndarray  – best individual found
-            best_fitness  : float
-            history_best  : list[float] – best fitness per generation
-            history_avg   : list[float] – mean fitness per generation
+            best               : np.ndarray  – best individual found
+            best_fitness       : float
+            history_best       : list[float] – best fitness per generation
+            history_avg        : list[float] – mean fitness per generation
+            stagnation_events  : list[int]   – generations where adaptive boost fired
         """
-        pop_size = self.config["pop_size"]
+        pop_size      = self.config["pop_size"]
         n_generations = self.config["n_generations"]
-        n_elite = self.config.get("n_elite", 1)
-        log_every = self.config.get("log_every", 10)
+        n_elite       = self.config.get("n_elite", 1)
+        log_every     = self.config.get("log_every", 10)
+        adaptive      = self.config.get("adaptive_mutation", True)
+        patience      = self.config.get("adaptive_patience", 20)
 
         population = self.init_fn(self.config)
-        history_best = []
-        history_avg = []
+        history_best      = []
+        history_avg       = []
+        stagnation_events = []
+
+        best_so_far     = -np.inf
+        stagnation_count = 0
 
         for gen in range(n_generations):
             fitness = self._evaluate(population)
 
-            history_best.append(float(np.max(fitness)))
+            current_best = float(np.max(fitness))
+            history_best.append(current_best)
             history_avg.append(float(np.mean(fitness)))
 
-            if gen % log_every == 0 or gen == n_generations - 1:
-                print(f"  Gen {gen:4d}/{n_generations} | "
-                      f"best={history_best[-1]:.6f} | avg={history_avg[-1]:.6f}")
+            # stagnation tracking
+            if current_best > best_so_far + 1e-8:
+                best_so_far = current_best
+                stagnation_count = 0
+            else:
+                stagnation_count += 1
 
-            # elitism: keep the top n_elite individuals unchanged
+            boost = adaptive and stagnation_count >= patience
+            if boost:
+                stagnation_events.append(gen)
+                stagnation_count = 0  # reset after firing
+
+            if gen % log_every == 0 or gen == n_generations - 1:
+                tag = " [BOOST]" if boost else ""
+                print(f"  Gen {gen:4d}/{n_generations} | "
+                      f"best={history_best[-1]:.6f} | avg={history_avg[-1]:.6f}{tag}")
+
+            # elitism
             elite_idx = np.argsort(fitness)[-n_elite:]
             elites = [population[i].copy() for i in elite_idx]
 
-            # selection + breeding to fill the rest of the population
+            # selection + breeding
             n_offspring = pop_size - n_elite
-            parents = self.selection_fn(population, fitness, n_offspring)
-            offspring = self._breed(parents)
+            parents  = self.selection_fn(population, fitness, n_offspring)
+            offspring = self._breed(parents, boost=boost)
 
             population = elites + offspring
 
-        # final evaluation to find the best individual
-        fitness = self._evaluate(population)
+        # final evaluation
+        fitness  = self._evaluate(population)
         best_idx = int(np.argmax(fitness))
 
         return {
-            "best": population[best_idx],
-            "best_fitness": float(fitness[best_idx]),
-            "history_best": history_best,
-            "history_avg": history_avg,
+            "best":              population[best_idx],
+            "best_fitness":      float(fitness[best_idx]),
+            "history_best":      history_best,
+            "history_avg":       history_avg,
+            "stagnation_events": stagnation_events,
         }
 
     # ------------------------------------------------------------------
@@ -104,15 +121,29 @@ class GeneticAlgorithm:
     # ------------------------------------------------------------------
 
     def _evaluate(self, population):
-        """Return a numpy array of fitness values for every individual."""
-        return np.array([self.fitness_fn(ind) for ind in population], dtype=float)
-
-    def _breed(self, parents):
         """
-        Produce len(parents) offspring from the parent list.
+        Return a numpy array of fitness values.
 
-        Parents are consumed in pairs (with wrap-around). Each pair produces
-        two children via crossover; each child is then independently mutated.
+        Uses ThreadPoolExecutor when n_jobs != 1.  Threads work well for
+        fitness functions that release the GIL (e.g. Gymnasium step loops).
+        """
+        n_jobs = self.config.get("n_jobs", 1)
+        if n_jobs == 1:
+            return np.array([self.fitness_fn(ind) for ind in population], dtype=float)
+
+        max_workers = None if n_jobs == -1 else n_jobs
+        with ThreadPoolExecutor(max_workers=max_workers) as ex:
+            results = list(ex.map(self.fitness_fn, population))
+        return np.array(results, dtype=float)
+
+    def _breed(self, parents, boost=False):
+        """
+        Produce len(parents) offspring via crossover + mutation.
+
+        When boost=True (stagnation detected), mutation is applied twice per
+        offspring — increasing exploration without changing operator signatures.
+        This is the RL-inspired adaptive exploration mechanism: when the reward
+        signal (fitness improvement) flatlines, exploration is increased.
         """
         offspring = []
         n = len(parents)
@@ -120,6 +151,11 @@ class GeneticAlgorithm:
             p1 = parents[i]
             p2 = parents[(i + 1) % n]
             c1, c2 = self.crossover_fn(p1, p2)
-            offspring.append(self.mutation_fn(c1))
-            offspring.append(self.mutation_fn(c2))
-        return offspring[:n]  # trim to exactly n in case n is odd
+            c1 = self.mutation_fn(c1)
+            c2 = self.mutation_fn(c2)
+            if boost:
+                c1 = self.mutation_fn(c1)
+                c2 = self.mutation_fn(c2)
+            offspring.append(c1)
+            offspring.append(c2)
+        return offspring[:n]

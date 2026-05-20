@@ -220,6 +220,71 @@ Comparison plots are saved to `results/task1/comparison_*.png` and `results/task
 | `pygad` | Available for optional comparison (not used in main code) |
 | `imageio[ffmpeg]` | Saving agent video as MP4 |
 
+---
 
-**Feedback**
-Combine path optimization and balance stability in the fitness function. Optimize TSP distance and CartPole balancing time. Apply reinforcement learning-assisted task switching. Implement parallel population evolution for faster computation. Add visualization for route optimization and control performance.
+## Improvements (feedback 13.05.2026)
+
+The following changes were made in response to tutor feedback requesting combined fitness functions, parallel evaluation, RL-inspired adaptive mutation, and richer visualisations.
+
+### 1. Combined fitness functions
+
+**TSP — path balance bonus**
+
+The TSP fitness function was extended to reward routes with balanced segment lengths in addition to minimising total distance:
+
+```
+f = (1 / (distance + ε)) × (1 + smoothness_weight × smoothness)
+```
+
+`smoothness` is computed as `1 / (1 + CV)`, where CV is the coefficient of variation of segment lengths. A route where all segments are roughly equal in length scores close to 1.0; heavily zigzagging routes score lower. The bonus is controlled by `smoothness_weight` (default 0.2) and can be disabled by setting it to 0.
+
+**CartPole — stability-penalised fitness**
+
+The CartPole fitness now penalises inconsistent performance across evaluation episodes:
+
+```
+f = mean_reward - stability_weight × std_reward
+```
+
+A policy that scores 500 in all 5 episodes is preferred over one that scores 500 in some and 300 in others. `stability_weight` defaults to 0.05 and can be tuned via CONFIG. A new `evaluate_policy_with_stats()` function in `cartpole_policy.py` returns `(mean, std)` to support this.
+
+---
+
+### 2. Parallel population evaluation
+
+Fitness evaluation is now parallelised using `concurrent.futures.ThreadPoolExecutor`. The number of worker threads is controlled by `n_jobs` in the config dict:
+
+- `n_jobs = 1` — sequential evaluation (original behaviour)
+- `n_jobs = -1` — use all available CPU threads (default for both tasks)
+
+Threads work well for Gymnasium-based fitness functions because the environment's step loop releases the Python GIL. For TSP the fitness computation is pure NumPy which also benefits from threading. No changes to the operator API were needed.
+
+---
+
+### 3. RL-inspired adaptive mutation (task switching)
+
+`GeneticAlgorithm` now tracks how many consecutive generations have passed without a fitness improvement (stagnation counter). When the counter exceeds `adaptive_patience` (default: 25 for TSP, 15 for CartPole), the mutation operator is applied **twice per offspring** instead of once for that generation, then the counter resets.
+
+This mirrors the exploration–exploitation trade-off from reinforcement learning: when the reward signal (fitness improvement) plateaus, the agent (GA) increases exploration. Applying the mutation twice effectively doubles the perturbation strength without requiring any change to the mutation function signatures or the operator API.
+
+Generations where the boost fired are recorded in `result["stagnation_events"]` and visualised as vertical dotted lines on the fitness/reward history plots.
+
+Config keys added: `adaptive_mutation` (bool, default `True`), `adaptive_patience` (int).
+
+---
+
+### 4. Visualisation improvements
+
+**TSP — dual y-axis fitness/distance plot**
+
+`plot_fitness_history` now adds a secondary y-axis on the right showing the best route distance (recovered from fitness as `d = 1/f − ε`). The right axis is inverted so that lower distance values appear higher, matching the fitness direction. This makes the chart directly interpretable without knowing the fitness formula. Stagnation boost events are marked as red dotted vertical lines.
+
+**CartPole — control performance plot**
+
+After training, `train_ga.py` automatically runs one episode with the best weights and saves `control_performance.png` to the results directory. The plot shows two panels:
+
+- **Top**: pole angle in degrees over each timestep, with ±12° failure-threshold lines
+- **Bottom**: cumulative reward over the same episode
+
+This visualises how stable and precise the learned policy is — not just the total reward, but the moment-by-moment control quality.
+
