@@ -219,3 +219,7 @@ Comparison plots are saved to `results/task1/comparison_*.png` and `results/task
 | `gymnasium[classic-control]` | CartPole-v1 environment |
 | `pygad` | Available for optional comparison (not used in main code) |
 | `imageio[ffmpeg]` | Saving agent video as MP4 |
+
+
+**Feedback**
+Combine path optimization and balance stability in the fitness function. Optimize TSP distance and CartPole balancing time. Apply reinforcement learning-assisted task switching. Implement parallel population evolution for faster computation. Add visualization for route optimization and control performance.
