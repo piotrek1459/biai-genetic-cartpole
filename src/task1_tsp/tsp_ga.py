@@ -129,6 +129,15 @@ def run_tsp(config=None):
 
     cities = generate_cities(cfg["n_cities"], seed=cfg["seed"])
 
+    # --- initial state visualisation (before GA) ---
+    rng_init = np.random.default_rng(cfg["seed"])
+    initial_perm = rng_init.permutation(cfg["n_cities"])
+    initial_dist = route_distance(cities, initial_perm)
+    initial_route_path = os.path.join(cfg["results_dir"], "initial_route.png")
+    plot_best_route(cities, initial_perm, initial_dist, initial_route_path,
+                    title="TSP – Initial Random Route")
+    print(f"Initial random route distance: {initial_dist:.4f}")
+
     init_fn = lambda c: init_population(c["pop_size"], c["n_cities"], rng)
     fitness_fn = make_fitness_fn(cities, cfg["epsilon"], cfg.get("smoothness_weight", 0.0))
     crossover_fn = _make_crossover(cfg["crossover"])

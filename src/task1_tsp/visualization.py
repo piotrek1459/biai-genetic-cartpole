@@ -58,19 +58,19 @@ def plot_fitness_history(history_best, history_avg, save_path,
     print(f"  Saved: {save_path}")
 
 
-def plot_best_route(cities, permutation, total_distance, save_path):
+def plot_best_route(cities, permutation, total_distance, save_path, title=None):
     """
-    Visualize the best TSP route found and save to file.
+    Visualize a TSP route and save to file.
 
     Parameters
     ----------
     cities         : np.ndarray, shape (n, 2)
-    permutation    : np.ndarray, shape (n,)  – city indices in visit order
+    permutation    : np.ndarray, shape (n,)
     total_distance : float
     save_path      : str
+    title          : str | None  – custom plot title; defaults to "TSP – Best Route"
     """
     ordered = cities[permutation]
-    # close the loop for drawing
     loop = np.vstack([ordered, ordered[0]])
 
     fig, ax = plt.subplots(figsize=(7, 7))
@@ -78,16 +78,15 @@ def plot_best_route(cities, permutation, total_distance, save_path):
     ax.plot(loop[:, 0], loop[:, 1], "-o", color="#2563eb",
             markersize=8, linewidth=1.5, zorder=2)
 
-    # label cities with their index
     for idx, (x, y) in enumerate(cities):
         ax.annotate(str(permutation.tolist().index(idx)),
                     xy=(x, y), xytext=(4, 4), textcoords="offset points",
                     fontsize=7, color="#374151")
 
-    # highlight the start city
     ax.scatter(*cities[permutation[0]], color="#ef4444", s=120, zorder=3, label="Start")
 
-    ax.set_title(f"TSP – Best Route  (distance = {total_distance:.4f})")
+    heading = title or "TSP – Best Route"
+    ax.set_title(f"{heading}  (distance = {total_distance:.4f})")
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.legend()

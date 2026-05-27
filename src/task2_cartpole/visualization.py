@@ -44,6 +44,53 @@ def plot_reward_history(history_best, history_avg, save_path, stagnation_events=
     print(f"  Saved: {save_path}")
 
 
+def plot_initial_cartpole(pole_angles, cart_positions, save_path):
+    """
+    Visualise the initial state of a random (untrained) CartPole agent.
+
+    Shows how the pole falls without any learned policy: pole angle and
+    cart position over the episode steps, with failure thresholds.
+
+    Parameters
+    ----------
+    pole_angles    : list[float]  – pole angle (rad) at each step
+    cart_positions : list[float]  – cart position at each step
+    save_path      : str
+    """
+    steps      = np.arange(len(pole_angles))
+    angles_deg = np.degrees(pole_angles)
+    threshold  = 12.0
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 6), sharex=True)
+
+    ax1.plot(steps, angles_deg, linewidth=1.8, color="#dc2626", label="Pole angle")
+    ax1.axhline(y= threshold, color="#9ca3af", linestyle=":", linewidth=1.2,
+                alpha=0.8, label=f"Failure threshold (±{threshold}°)")
+    ax1.axhline(y=-threshold, color="#9ca3af", linestyle=":", linewidth=1.2, alpha=0.8)
+    ax1.axhline(y=0, color="#9ca3af", linestyle="--", linewidth=0.8, alpha=0.5)
+    ax1.set_ylabel("Pole Angle (degrees)")
+    ax1.set_ylim(-threshold * 2.5, threshold * 2.5)
+    ax1.legend(fontsize=9)
+    ax1.grid(True, alpha=0.3)
+
+    ax2.plot(steps, cart_positions, linewidth=1.8, color="#f59e0b", label="Cart position")
+    ax2.axhline(y= 2.4, color="#9ca3af", linestyle=":", linewidth=1.2,
+                alpha=0.8, label="Position limit (±2.4)")
+    ax2.axhline(y=-2.4, color="#9ca3af", linestyle=":", linewidth=1.2, alpha=0.8)
+    ax2.set_xlabel("Step")
+    ax2.set_ylabel("Cart Position")
+    ax2.legend(fontsize=9)
+    ax2.grid(True, alpha=0.3)
+
+    total = len(pole_angles)
+    fig.suptitle(f"CartPole – Initial State: Random Policy  (survived {total} steps)",
+                 fontsize=11)
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=150)
+    plt.close(fig)
+    print(f"  Saved: {save_path}")
+
+
 def plot_control_performance(pole_angles, save_path):
     """
     Visualise the best agent's control behaviour during one episode.

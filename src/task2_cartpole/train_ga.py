@@ -7,7 +7,7 @@ from src.common.selection import tournament_selection, roulette_selection
 from src.common.crossover import uniform_crossover, arithmetic_crossover
 from src.common.mutation import gaussian_mutation
 from src.task2_cartpole.cartpole_policy import LinearPolicy, evaluate_policy_with_stats
-from src.task2_cartpole.visualization import plot_reward_history, plot_control_performance
+from src.task2_cartpole.visualization import plot_reward_history, plot_control_performance, plot_initial_cartpole
 
 CONFIG = {
     "n_weights": 5,
@@ -100,6 +100,10 @@ def run_cartpole(config=None):
     print(f"\n=== CartPole GA | pop={cfg['pop_size']} | gen={cfg['n_generations']} | "
           f"sigma={cfg['sigma']} | episodes={cfg['n_eval_episodes']} ===")
 
+    # --- initial state visualisation (before GA) ---
+    init_path = os.path.join(cfg["results_dir"], "initial_state.png")
+    _save_initial_state(cfg["seed"], init_path)
+
     ga = GeneticAlgorithm(
         config=cfg,
         init_fn=init_fn,
@@ -127,6 +131,26 @@ def run_cartpole(config=None):
     _save_control_performance(result["best"], ctrl_path)
 
     return result
+
+
+def _save_initial_state(seed, save_path):
+    """Run one episode with a random policy and save the initial-state plot."""
+    rng = np.random.default_rng(seed)
+    random_weights = rng.standard_normal(5)
+    policy = LinearPolicy(random_weights)
+    env = gymnasium.make("CartPole-v1")
+    obs, _ = env.reset(seed=seed)
+    pole_angles, cart_positions = [], []
+    done = False
+    while not done:
+        pole_angles.append(float(obs[2]))
+        cart_positions.append(float(obs[0]))
+        action = policy.act(obs)
+        obs, _, term, trunc, _ = env.step(action)
+        done = term or trunc
+    env.close()
+    print(f"Random policy survived {len(pole_angles)} steps")
+    plot_initial_cartpole(pole_angles, cart_positions, save_path)
 
 
 def _save_control_performance(weights, save_path):

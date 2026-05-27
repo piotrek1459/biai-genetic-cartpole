@@ -288,5 +288,27 @@ After training, `train_ga.py` automatically runs one episode with the best weigh
 
 This visualises how stable and precise the learned policy is — not just the total reward, but the moment-by-moment control quality.
 
-**Feedback**
-- Provide the graphical representation of both tasks separately at the initial stage, and further work on the necessary improvements and refinements.
+---
+
+## Improvements (feedback 27.05.2026)
+
+The following changes were made in response to reviewer feedback requesting graphical representation of both tasks at the initial (pre-training) stage, so that the improvement brought by the GA is clearly visible by comparison.
+
+### Initial state visualisation — TSP
+
+At the start of `run_tsp()`, before the GA runs, a single random route is sampled from the same city layout and saved as `results/task1/initial_route.png`. The plot uses the same visual style as the post-training best-route plot so the two can be directly compared side by side.
+
+The initial random route typically has distance **5–8** (zigzagging, no structure). After 300 generations the GA reduces this to **~3.4**, demonstrating the improvement clearly.
+
+New output file: `results/task1/initial_route.png`
+
+### Initial state visualisation — CartPole
+
+At the start of `run_cartpole()`, before the GA runs, one episode is played using a **random policy** (random weight vector). The episode is recorded and saved as `results/task2/initial_state.png`. The plot has two panels:
+
+- **Top**: pole angle in degrees — shows the pole falling quickly past the ±12° threshold
+- **Bottom**: cart position — shows uncontrolled drift toward the ±2.4 position limit
+
+A random policy typically survives only **5–20 steps**. The trained policy (saved as `control_performance.png`) survives all **500 steps**, making the before/after comparison immediate and clear.
+
+New output file: `results/task2/initial_state.png`
