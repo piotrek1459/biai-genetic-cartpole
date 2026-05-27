@@ -288,3 +288,5 @@ After training, `train_ga.py` automatically runs one episode with the best weigh
 
 This visualises how stable and precise the learned policy is — not just the total reward, but the moment-by-moment control quality.
 
+**Feedback**
+- Provide the graphical representation of both tasks separately at the initial stage, and further work on the necessary improvements and refinements.
