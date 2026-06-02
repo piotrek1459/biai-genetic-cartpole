@@ -17,18 +17,9 @@ from src.task2_cartpole.cartpole_policy import LinearPolicy
 
 
 def render_agent(weights_path, n_episodes=3, record=True, output_path=None):
-    """
-    Load weights from file, run the agent, optionally save a video.
-
-    Parameters
-    ----------
-    weights_path : str   – path to .npy file with weight vector
-    n_episodes   : int
-    record       : bool  – whether to save an MP4 video
-    output_path  : str | None  – video save path; defaults to results/task2/agent.mp4
-    """
+    """Load weights, run the agent, optionally save a video."""
     weights = np.load(weights_path)
-    policy = LinearPolicy(weights)
+    policy  = LinearPolicy(weights)
 
     render_mode = "rgb_array" if record else "human"
     env = gymnasium.make("CartPole-v1", render_mode=render_mode)
@@ -51,7 +42,7 @@ def render_agent(weights_path, n_episodes=3, record=True, output_path=None):
 
     if record and frames:
         if output_path is None:
-            output_path = "results/task2/agent.mp4"
+            output_path = "results/task2/trained/agent.mp4"
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         imageio.mimwrite(output_path, frames, fps=30)
         print(f"Video saved to {output_path}")
@@ -59,14 +50,10 @@ def render_agent(weights_path, n_episodes=3, record=True, output_path=None):
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate best CartPole agent")
-    parser.add_argument("--weights", default="results/task2/best_weights.npy",
-                        help="Path to .npy weights file")
-    parser.add_argument("--episodes", type=int, default=3,
-                        help="Number of episodes to run")
-    parser.add_argument("--no-record", action="store_true",
-                        help="Disable video recording (render live instead)")
-    parser.add_argument("--output", default=None,
-                        help="Output video path (default: results/task2/agent.mp4)")
+    parser.add_argument("--weights", default="results/task2/best_weights.npy")
+    parser.add_argument("--episodes", type=int, default=3)
+    parser.add_argument("--no-record", action="store_true")
+    parser.add_argument("--output", default=None)
     args = parser.parse_args()
 
     render_agent(
@@ -79,3 +66,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
