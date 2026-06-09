@@ -1,0 +1,13 @@
+flowchart TD
+    A([START]) --> B["mkdir: initial/  trained/  comparison/"]
+    B --> C["random_policy = LinearPolicy(N(0,1) x 5)\n_run_episode -> angles, positions, frames"]
+    C --> D["initial/control.png\ninitial/agent.mp4"]
+    D --> E["fitness = mean_reward - 0.05 * std_reward\nevaluated over 5 episodes, parallel\naction = 1 if w*obs + bias > 0 else 0"]
+    E --> F["GeneticAlgorithm\nchromosome: float[5] = [w0,w1,w2,w3,bias]\ncrossover: uniform prob=0.5\nmutation: gaussian sigma=0.3 rate=0.10\nselection: tournament k=4\npop=50  gen=100  elite=2  patience=15"]
+    F --> G(["GA LOOP — 100 generations"])
+    G --> H["best_weights = result['best']\nsave best_weights.npy\nplot reward_history.png"]
+    H --> I["trained_policy = LinearPolicy(best_weights)\n_run_episode -> angles, positions, frames"]
+    I --> J["trained/control.png\ntrained/agent.mp4"]
+    J --> K["comparison/control_comparison.png\n2x2: random vs trained\nangle + cart position"]
+    J --> L["comparison/agent_comparison.mp4\nside-by-side: random | trained"]
+    K & L --> M(["END — reward 500/500\nin ~10 generations"])

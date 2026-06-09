@@ -3,6 +3,7 @@ marp: true
 theme: default
 paginate: true
 size: 16:9
+math: mathjax
 style: |
   section {
     font-family: 'Segoe UI', Arial, sans-serif;
@@ -137,6 +138,42 @@ GeneticAlgorithm(
 
 </div>
 </div>
+
+---
+
+## Module Architecture
+
+How `src/common/` operators are shared between both tasks.
+
+![w:900px](docs/slide_arch.png)
+
+---
+
+## GA Loop — Core Algorithm (1/2)
+
+The `GeneticAlgorithm.run()` loop — shared by both tasks.
+
+![w:820px](docs/slide_ga_loop.png)
+
+---
+
+## GA Loop — Core Algorithm (2/2): Breeding
+
+How each pair of parents produces offspring inside `_breed()`.
+
+![w:700px](docs/slide_breed.png)
+
+---
+
+## Task 1: TSP — Full Execution Flow
+
+![w:860px](docs/slide_tsp.png)
+
+---
+
+## Task 2: CartPole — Full Execution Flow
+
+![w:900px](docs/slide_cartpole.png)
 
 ---
 

@@ -1,0 +1,27 @@
+flowchart LR
+    subgraph common ["src/common/"]
+        GA["ga_base.py\nGeneticAlgorithm"]
+        SEL["selection.py\ntournament / roulette"]
+        CX["crossover.py\nOX · PMX · uniform · arithmetic"]
+        MUT["mutation.py\ninversion · swap · scramble · gaussian"]
+    end
+    subgraph tsp ["src/task1_tsp/"]
+        TSPGA["tsp_ga.py\nrun_tsp()"]
+        TSPVIZ["visualization.py"]
+    end
+    subgraph cp ["src/task2_cartpole/"]
+        TRAIN["train_ga.py\nrun_cartpole()"]
+        POL["cartpole_policy.py\nLinearPolicy"]
+        CPVIZ["visualization.py"]
+    end
+    GA -->|"GeneticAlgorithm()"| TSPGA
+    GA -->|"GeneticAlgorithm()"| TRAIN
+    SEL -->|"selection_fn"| TSPGA
+    SEL -->|"selection_fn"| TRAIN
+    CX -->|"permutation ops"| TSPGA
+    CX -->|"real-valued ops"| TRAIN
+    MUT -->|"inversion/swap/scramble"| TSPGA
+    MUT -->|"gaussian"| TRAIN
+    TSPGA --> TSPVIZ
+    TRAIN --> CPVIZ
+    TRAIN --> POL

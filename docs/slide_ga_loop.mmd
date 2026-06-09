@@ -1,0 +1,17 @@
+flowchart TD
+    A([START]) --> B["population = init_fn(config)\nbest_so_far = -inf, stagnation_count = 0"]
+    B --> C{gen < n_generations?}
+    C -- No --> Z(["return best individual\n+ history_best, history_avg\n+ stagnation_events"])
+    C -- Yes --> D["fitness = _evaluate(population)\n(parallel via ThreadPoolExecutor if n_jobs != 1)"]
+    D --> E["history_best.append(max)\nhistory_avg.append(mean)"]
+    E --> F{improved?}
+    F -- Yes --> G["best_so_far = current_best\nstagnation_count = 0, boost = False"]
+    F -- No --> H["stagnation_count += 1"]
+    H --> I{stagnation >= patience?}
+    I -- Yes --> K["boost = True\nstagnation_count = 0\nlog BOOST"]
+    I -- No --> J["boost = False"]
+    G & J & K --> L["elites = top n_elite (unchanged)"]
+    L --> M["parents = selection_fn(pop, fitness, n_offspring)\ntournament k=4  or  roulette"]
+    M --> N["offspring = _breed(parents, boost)"]
+    N --> O["population = elites + offspring"]
+    O --> P["gen += 1"] --> C

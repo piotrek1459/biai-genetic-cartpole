@@ -1,0 +1,11 @@
+flowchart TD
+    A([START]) --> B["generate_cities(n=20, seed=42)\n20 random points in unit square"]
+    B --> C["initial_perm = random permutation\nplot initial_route.png"]
+    C --> D["fitness = 1/(distance + e) * (1 + 0.2 * smoothness)\nsmoothness = 1/(1 + std/mean of segment lengths)"]
+    D --> E["GeneticAlgorithm\nchromosome: int[20] permutation\ncrossover: OX or PMX\nmutation: inversion rate=0.10\nselection: tournament k=4\npop=80  gen=300  elite=2  patience=25"]
+    E --> F(["GA LOOP — 300 generations"])
+    F --> G["best_permutation = result['best']"]
+    G --> H["plot fitness_history.png\nleft axis: fitness\nright axis: route distance\nboost events marked"]
+    G --> I["plot best_route.png\ncity scatter + route lines"]
+    G --> J["save best_route.npy"]
+    H & I & J --> K(["END\nbest distance ~ 3.4\ntheoretical optimum ~ 3.1"])
