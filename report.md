@@ -165,6 +165,50 @@ How each pair of parents produces offspring inside `_breed()`.
 
 ---
 
+## Plugin Interface — One GA, Any Problem
+
+The **5 callables** are the only thing that changes between tasks. `ga_base.py` never changes.
+
+![w:940px](docs/slide_plugin.png)
+
+---
+
+<!-- _style: "section { font-size: 0.72em; }" -->
+
+## Pseudocode — GA Algorithm
+
+```
+INITIALISE:  population ← init_fn(config)
+             best_so_far ← -∞,  stagnation_count ← 0
+
+FOR gen = 0 TO n_generations - 1:
+
+  fitness[i] ← fitness_fn(population[i])   ← parallel if n_jobs ≠ 1
+
+  STAGNATION CHECK:
+    IF improved: best_so_far ← max; stagnation_count ← 0; boost ← FALSE
+    ELSE:        stagnation_count += 1
+                 IF stagnation_count ≥ patience: boost ← TRUE; reset
+
+  elites  ← top n_elite individuals  (unchanged)
+  parents ← selection_fn(pop, fitness, pop_size - n_elite)
+
+  FOR each pair (p1, p2) in parents:
+    (c1, c2) ← crossover_fn(p1, p2)     ← OX/PMX  or  uniform/arithmetic
+    c1 ← mutation_fn(c1)                 ← inversion/scramble  or  gaussian
+    c2 ← mutation_fn(c2)
+    IF boost: c1 ← mutation_fn(c1)       ← 2× perturbation breaks stagnation
+              c2 ← mutation_fn(c2)
+
+  population ← elites ∪ offspring
+
+RETURN { best, best_fitness, history_best, history_avg, stagnation_events }
+```
+
+> To add **Task N**: implement `init_fn`, `fitness_fn`, `crossover_fn`, `mutation_fn`, `selection_fn` — then call `GeneticAlgorithm(...).run()`. Zero changes to `ga_base.py`. Full pseudocode in `docs/pseudocode.md`.
+
+---
+
 ## Task 1: TSP — Full Execution Flow
 
 ![w:860px](docs/slide_tsp.png)

@@ -1,0 +1,42 @@
+flowchart TB
+    subgraph TSP ["Task 1 — TSP (tsp_ga.py)"]
+        direction TB
+        T1["init_fn\nlist of random permutations\nint[20]"]
+        T2["fitness_fn\n1/(distance+e) * smoothness_bonus"]
+        T3["crossover_fn\nOX or PMX\npermutation-safe"]
+        T4["mutation_fn\ninversion / swap / scramble"]
+        T5["selection_fn\ntournament k=4"]
+    end
+
+    subgraph CP ["Task 2 — CartPole (train_ga.py)"]
+        direction TB
+        C1["init_fn\nlist of random float vectors\nfloat[5]"]
+        C2["fitness_fn\nmean_reward - 0.05 * std_reward\n5 episodes parallel"]
+        C3["crossover_fn\nuniform or arithmetic\nreal-valued blend"]
+        C4["mutation_fn\ngaussian N(0, sigma=0.3)"]
+        C5["selection_fn\ntournament k=4"]
+    end
+
+    subgraph NEW ["Task N — Any New Problem"]
+        direction TB
+        N1["init_fn\n(implement for your domain)"]
+        N2["fitness_fn\n(implement for your domain)"]
+        N3["crossover_fn\n(implement for your domain)"]
+        N4["mutation_fn\n(implement for your domain)"]
+        N5["selection_fn\n(reuse from common/)"]
+    end
+
+    subgraph CORE ["GeneticAlgorithm  —  src/common/ga_base.py  (never changes)"]
+        direction LR
+        INIT["population = init_fn(config)"]
+        EVAL["fitness = eval_fn(population)"]
+        SEL["parents = selection_fn(pop, fit, n)"]
+        CX["c1,c2 = crossover_fn(p1, p2)"]
+        MUT["c = mutation_fn(c)"]
+        REPLACE["population = elites + offspring"]
+        INIT --> EVAL --> SEL --> CX --> MUT --> REPLACE --> EVAL
+    end
+
+    T1 & T2 & T3 & T4 & T5 -->|"injected as callables"| CORE
+    C1 & C2 & C3 & C4 & C5 -->|"injected as callables"| CORE
+    N1 & N2 & N3 & N4 & N5 -.->|"only 5 functions needed"| CORE
