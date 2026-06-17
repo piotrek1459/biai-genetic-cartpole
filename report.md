@@ -165,11 +165,46 @@ How each pair of parents produces offspring inside `_breed()`.
 
 ---
 
+<!-- _style: "section { font-size: 0.78em; }" -->
+
 ## Plugin Interface — One GA, Any Problem
 
 The **5 callables** are the only thing that changes between tasks. `ga_base.py` never changes.
 
-![w:940px](docs/slide_plugin.png)
+<div class="columns">
+<div>
+
+![w:540px](docs/slide_plugin.png)
+
+</div>
+<div>
+
+**Exact location in code — `src/common/ga_base.py` lines 25–38:**
+
+```python
+# Lines 25-29: interface contract (docstring)
+init_fn      : (config) -> list[np.ndarray]
+fitness_fn   : (individual) -> float
+crossover_fn : (p1, p2) -> (c1, c2)
+mutation_fn  : (individual) -> np.ndarray
+selection_fn : (pop, fitness, n) -> list[np.ndarray]
+
+# Lines 32-38: constructor stores the callables
+def __init__(self, config,
+             init_fn, fitness_fn,
+             crossover_fn, mutation_fn,
+             selection_fn):
+    self.init_fn      = init_fn
+    self.fitness_fn   = fitness_fn
+    self.crossover_fn = crossover_fn
+    self.mutation_fn  = mutation_fn
+    self.selection_fn = selection_fn
+```
+
+To add **any new problem**: implement these 5 functions and pass them in. The loop in `run()` never changes.
+
+</div>
+</div>
 
 ---
 

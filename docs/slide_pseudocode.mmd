@@ -1,0 +1,71 @@
+flowchart TD
+    START([START]) --> INIT
+
+    subgraph INIT_BLOCK ["INITIALISE"]
+        INIT["population ← init_fn(config)\nbest_so_far ← -∞\nstagnation_count ← 0"]
+    end
+
+    INIT --> LOOP_CHECK{gen < n_generations?}
+    LOOP_CHECK -- No --> FINAL
+
+    subgraph FINAL_BLOCK ["RETURN"]
+        FINAL["fitness ← fitness_fn for all\nbest ← argmax(fitness)\nreturn best, history, stagnation_events"]
+    end
+
+    FINAL --> END_NODE([END])
+
+    LOOP_CHECK -- Yes --> EVAL
+
+    subgraph EVAL_BLOCK ["1. EVALUATE"]
+        EVAL["fitness_fn(individual)\nfor every individual in population\n(parallel if n_jobs ≠ 1)"]
+    end
+
+    EVAL --> HISTORY
+
+    subgraph HIST_BLOCK ["2. RECORD"]
+        HISTORY["history_best.append(max)\nhistory_avg.append(mean)"]
+    end
+
+    HISTORY --> IMPROVED{improved?}
+
+    subgraph STAG_BLOCK ["3. STAGNATION CHECK"]
+        IMPROVED -- Yes --> RESET["best_so_far ← max\nstagnation_count ← 0\nboost ← FALSE"]
+        IMPROVED -- No --> INCREMENT["stagnation_count += 1"]
+        INCREMENT --> PATIENCE{stagnation_count\n≥ patience?}
+        PATIENCE -- Yes --> BOOST["boost ← TRUE\nstagnation_count ← 0"]
+        PATIENCE -- No --> NO_BOOST["boost ← FALSE"]
+    end
+
+    RESET --> ELITISM
+    BOOST --> ELITISM
+    NO_BOOST --> ELITISM
+
+    subgraph ELITE_BLOCK ["4. ELITISM"]
+        ELITISM["elites ← top n_elite individuals\ncopied unchanged to next generation"]
+    end
+
+    ELITISM --> SELECTION
+
+    subgraph SEL_BLOCK ["5. SELECTION"]
+        SELECTION["parents ← selection_fn(pop, fitness, n)\ntournament k=4  or  roulette wheel"]
+    end
+
+    SELECTION --> CROSSOVER
+
+    subgraph BREED_BLOCK ["6. CROSSOVER + MUTATION"]
+        CROSSOVER["c1, c2 ← crossover_fn(p1, p2)\nTSP: OX or PMX\nCartPole: uniform or arithmetic"]
+        CROSSOVER --> MUTATE["c1 ← mutation_fn(c1)\nc2 ← mutation_fn(c2)\nTSP: inversion / swap / scramble\nCartPole: gaussian N(0, σ)"]
+        MUTATE --> BOOST_CHECK{boost?}
+        BOOST_CHECK -- Yes --> DOUBLE["c1 ← mutation_fn(c1) again\nc2 ← mutation_fn(c2) again\n2× perturbation"]
+        BOOST_CHECK -- No --> APPEND["offspring.append(c1, c2)"]
+        DOUBLE --> APPEND
+    end
+
+    APPEND --> NEW_POP
+
+    subgraph POP_BLOCK ["7. NEW POPULATION"]
+        NEW_POP["population ← elites ∪ offspring\nsize always = pop_size"]
+    end
+
+    NEW_POP --> NEXT_GEN["gen += 1"]
+    NEXT_GEN --> LOOP_CHECK
