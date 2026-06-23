@@ -7,13 +7,14 @@ math: mathjax
 style: |
   section {
     font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 1em;
   }
-  section.lead h1 { font-size: 2.2em; }
-  section.lead h2 { font-size: 1.2em; color: #555; }
-  table { font-size: 0.85em; }
-  code { font-size: 0.82em; }
-  .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5em; }
-  .small { font-size: 0.78em; }
+  section.lead h1 { font-size: 2em; }
+  section.lead h2 { font-size: 1.15em; color: #555; }
+  .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2em; }
+  .columns3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1em; }
+  table { font-size: 0.82em; }
+  code { font-size: 0.8em; }
 ---
 
 <!-- _class: lead -->
@@ -21,244 +22,72 @@ style: |
 # Genetic Algorithm
 ## TSP & CartPole-v1
 
-**BIAI — Progress Report**
+**BIAI — Final Report**
 
 Piotr Krupiński · Jeremi Szczotka
 
 Politechnika Śląska · 2026
 
-github.com/piotrek1459/biai-genetic-cartpole
+[github.com/piotrek1459/biai-genetic-cartpole](https://github.com/piotrek1459/biai-genetic-cartpole)
 
 ---
 
-## Selected Topics
+## Problem Statement
 
 <div class="columns">
 <div>
 
 ### Task 1 — TSP
-**Traveling Salesman Problem**
+Find the **shortest round-trip route** visiting every city exactly once.
 
-Find the shortest route visiting all cities exactly once and returning to the start.
-
-- Classic combinatorial optimisation
+- NP-hard combinatorial optimisation
+- No polynomial exact algorithm for large n
 - Chromosome: **permutation** of city indices
 - Fitness: `1 / (distance + ε)`
+- 20 cities, theoretical optimum ≈ 3.1
 
 </div>
 <div>
 
 ### Task 2 — CartPole-v1
-**Gymnasium reinforcement environment**
+**Balance a pole** on a moving cart — push left or right each step.
 
-Keep a pole balanced on a moving cart by pushing left or right.
-
-- Control / policy learning task
-- Chromosome: **real-valued** weight vector
-- Fitness: mean episode reward
-
-</div>
-</div>
-
-> Both problems are fundamentally different — TSP requires permutation operators, CartPole requires real-valued operators. One codebase handles both.
-
----
-
-## Project Goals
-
-1. Implement a **generic GA framework** reusable across problem types
-2. Implement all core **genetic operators** from scratch:
-   - Selection: tournament, roulette
-   - Crossover: OX, PMX (permutation) · uniform, arithmetic (real-valued)
-   - Mutation: swap, inversion, scramble (permutation) · Gaussian (real-valued)
-3. **Solve TSP** for 20 cities — minimise total route distance
-4. **Solve CartPole** — learn a linear policy that achieves max reward (500)
-5. **Compare hyperparameters** — operators, population size, mutation strength
-6. Produce visualisations, comparison plots, and an agent video
-
----
-
-## Plan of Work
-
-| Phase | Task | Status |
-|-------|------|--------|
-| 1 | Repository scaffold, `requirements.txt`, virtualenv | ✅ Done |
-| 2 | Common operators — `selection.py`, `mutation.py`, `crossover.py` | ✅ Done |
-| 3 | Generic `GeneticAlgorithm` class (`ga_base.py`) | ✅ Done |
-| 4 | Task 1: TSP — training, visualisation, experiments | ✅ Done |
-| 5 | Task 2: CartPole — policy, training, agent video, experiments | ✅ Done |
-| 6 | README, `.gitignore`, documentation, progress report | ✅ Done |
-
-**All phases complete.** Both algorithms run end-to-end and produce results.
-
----
-
-<!-- _style: "section { font-size: 0.88em; }" -->
-
-## Implementation Overview
-
-<div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1.5em;">
-<div>
-
-```
-src/
-  common/
-    ga_base.py      ← GeneticAlgorithm class
-    selection.py    ← tournament, roulette
-    crossover.py    ← OX, PMX, uniform, arithmetic
-    mutation.py     ← swap, inversion, scramble,
-                       gaussian
-  task1_tsp/
-    tsp_ga.py       ← CONFIG + run_tsp()
-    experiments.py  ← operator & population runs
-  task2_cartpole/
-    cartpole_policy.py  ← LinearPolicy
-    train_ga.py         ← CONFIG + run_cartpole()
-    evaluate.py         ← record agent as MP4
-    experiments.py      ← sigma, pop, episodes
-```
-
-</div>
-<div>
-
-**Design principle:**
-
-The `GeneticAlgorithm` class is **fully generic** — it receives operators as callables and has no knowledge of TSP or CartPole.
-
-```python
-GeneticAlgorithm(
-  config       = {...},
-  init_fn      = init_population,
-  fitness_fn   = make_fitness_fn(...),
-  crossover_fn = ox_crossover,
-  mutation_fn  = inversion_mutation,
-  selection_fn = tournament_selection,
-)
-```
+- Continuous control task (Gymnasium)
+- Episode ends when pole falls (> ±12°) or cart drifts (> ±2.4)
+- Chromosome: **5 real-valued weights** `[w₀..w₃, bias]`
+- Fitness: mean reward over 5 episodes
+- Max reward: **500 steps**
 
 </div>
 </div>
 
----
-
-## Module Architecture
-
-How `src/common/` operators are shared between both tasks.
-
-![w:900px](docs/slide_arch.png)
+> Why GA? Both problems have large, poorly-understood search spaces where gradient methods are inapplicable or ineffective.
 
 ---
 
-## GA Loop — Core Algorithm (1/2)
+<!-- _style: "section { font-size: 0.9em; }" -->
 
-The `GeneticAlgorithm.run()` loop — shared by both tasks.
+## Genetic Algorithm — Key Idea
 
-![w:820px](docs/slide_ga_loop.png)
+Inspired by **biological evolution**: a population of candidate solutions improves over generations.
 
----
+| Step | What happens |
+|------|-------------|
+| **1. Initialise** | Create a random population of `pop_size` individuals |
+| **2. Evaluate** | Compute fitness for every individual (parallel if `n_jobs ≠ 1`) |
+| **3. Elitism** | Copy the top `n_elite` individuals unchanged |
+| **4. Selection** | Choose parents: **tournament** (draw k, pick best) or **roulette** (∝ fitness) |
+| **5. Crossover** | Combine two parents → two children |
+| **6. Mutation** | Randomly perturb each child |
+| **7. Replace** | New population = elites + offspring; repeat |
 
-## GA Loop — Core Algorithm (2/2): Breeding
-
-How each pair of parents produces offspring inside `_breed()`.
-
-![w:700px](docs/slide_breed.png)
-
----
-
-<!-- _style: "section { font-size: 0.78em; }" -->
-
-## Plugin Interface — One GA, Any Problem
-
-The **5 callables** are the only thing that changes between tasks. `ga_base.py` never changes.
-
-<div class="columns">
-<div>
-
-![w:540px](docs/slide_plugin.png)
-
-</div>
-<div>
-
-**Exact location in code — `src/common/ga_base.py` lines 25–38:**
-
-```python
-# Lines 25-29: interface contract (docstring)
-init_fn      : (config) -> list[np.ndarray]
-fitness_fn   : (individual) -> float
-crossover_fn : (p1, p2) -> (c1, c2)
-mutation_fn  : (individual) -> np.ndarray
-selection_fn : (pop, fitness, n) -> list[np.ndarray]
-
-# Lines 32-38: constructor stores the callables
-def __init__(self, config,
-             init_fn, fitness_fn,
-             crossover_fn, mutation_fn,
-             selection_fn):
-    self.init_fn      = init_fn
-    self.fitness_fn   = fitness_fn
-    self.crossover_fn = crossover_fn
-    self.mutation_fn  = mutation_fn
-    self.selection_fn = selection_fn
-```
-
-To add **any new problem**: implement these 5 functions and pass them in. The loop in `run()` never changes.
-
-</div>
-</div>
-
----
-
-<!-- _style: "section { font-size: 0.72em; }" -->
-
-## Pseudocode — GA Algorithm
-
-```
-INITIALISE:  population ← init_fn(config)
-             best_so_far ← -∞,  stagnation_count ← 0
-
-FOR gen = 0 TO n_generations - 1:
-
-  fitness[i] ← fitness_fn(population[i])   ← parallel if n_jobs ≠ 1
-
-  STAGNATION CHECK:
-    IF improved: best_so_far ← max; stagnation_count ← 0; boost ← FALSE
-    ELSE:        stagnation_count += 1
-                 IF stagnation_count ≥ patience: boost ← TRUE; reset
-
-  elites  ← top n_elite individuals  (unchanged)
-  parents ← selection_fn(pop, fitness, pop_size - n_elite)
-
-  FOR each pair (p1, p2) in parents:
-    (c1, c2) ← crossover_fn(p1, p2)     ← OX/PMX  or  uniform/arithmetic
-    c1 ← mutation_fn(c1)                 ← inversion/scramble  or  gaussian
-    c2 ← mutation_fn(c2)
-    IF boost: c1 ← mutation_fn(c1)       ← 2× perturbation breaks stagnation
-              c2 ← mutation_fn(c2)
-
-  population ← elites ∪ offspring
-
-RETURN { best, best_fitness, history_best, history_avg, stagnation_events }
-```
-
-> To add **Task N**: implement `init_fn`, `fitness_fn`, `crossover_fn`, `mutation_fn`, `selection_fn` — then call `GeneticAlgorithm(...).run()`. Zero changes to `ga_base.py`. Full pseudocode in `docs/pseudocode.md`.
-
----
-
-## Task 1: TSP — Full Execution Flow
-
-![w:860px](docs/slide_tsp.png)
-
----
-
-## Task 2: CartPole — Full Execution Flow
-
-![w:900px](docs/slide_cartpole.png)
+**Adaptive boost:** if fitness does not improve for `patience` generations, mutation is applied **twice** per offspring — inspired by RL exploration vs. exploitation.
 
 ---
 
 <!-- _style: "section { font-size: 0.82em; }" -->
 
-## GA Core — Genetic Operators
+## GA Operators — Quick Reference
 
 <div class="columns">
 <div>
@@ -266,172 +95,184 @@ RETURN { best, best_fitness, history_best, history_avg, stagnation_events }
 ### Selection
 | Method | Key property |
 |--------|-------------|
-| Tournament (`k=4`) | Tunable pressure via `k` |
-| Roulette wheel | Proportional to fitness |
+| Tournament (k=4) | Tunable pressure; higher k → faster convergence |
+| Roulette wheel | Proportional to fitness; weaker pressure |
 
 ### Crossover
-| Operator | Type |
-|----------|------|
-| OX — Order Crossover | Permutation |
-| PMX — Partially Mapped | Permutation |
-| Uniform | Real-valued |
-| Arithmetic blend | Real-valued |
+| Operator | Domain | Description |
+|----------|--------|-------------|
+| OX | Permutation | Copy segment from p1; fill from p2 in order |
+| PMX | Permutation | Copy segment; resolve conflicts via mapping |
+| Uniform | Real-valued | Each gene from random parent (p=0.5) |
+| Arithmetic | Real-valued | `c = α·p1 + (1−α)·p2`, α~U(0,1) |
 
 </div>
 <div>
 
 ### Mutation
-| Operator | Type |
-|----------|------|
-| Swap | Permutation |
-| Inversion *(default TSP)* | Permutation |
-| Scramble | Permutation |
-| Gaussian N(0, σ) | Real-valued |
+| Operator | Domain | Description |
+|----------|--------|-------------|
+| Inversion *(default TSP)* | Permutation | Reverse a random sub-sequence |
+| Swap | Permutation | Swap two random genes |
+| Scramble | Permutation | Shuffle a random sub-sequence |
+| Gaussian N(0,σ) *(CartPole)* | Real-valued | Add noise to each gene independently |
 
 ### Elitism
-Top `n_elite = 2` individuals are copied unchanged into the next generation, preventing loss of the best solution found so far.
+Top `n_elite = 2` individuals are **copied unchanged** into the next generation — prevents losing the best solution found.
 
 </div>
 </div>
 
 ---
 
-## Task 1: TSP — Algorithm
+## Architecture — One GA, Two Problems
 
-**Chromosome:** permutation of city indices, e.g. `[2, 0, 4, 1, 3]`
-→ route: city 2 → city 0 → city 4 → city 1 → city 3 → city 2
+`src/common/` contains the shared generic core. Both tasks inject their domain logic as callables.
 
-**Fitness:**
-$$f(\text{route}) = \frac{1}{\text{total distance} + \varepsilon}$$
-
-Maximising fitness ≡ minimising total Euclidean round-trip distance.
-
-**Default configuration:**
-
-| pop | generations | crossover | mutation | elites | tournament k |
-|-----|-------------|-----------|----------|--------|--------------|
-| 80  | 300         | OX        | Inversion, rate=0.10 | 2 | 4 |
-
-Cities: 20 random points in [0, 1]² · Theoretical optimum ≈ 3.1
+![h:490px](docs/slide_arch.png)
 
 ---
 
-## Task 1: TSP — Results
+## The Plugin Interface — The "Switch"
+
+The **only difference** between TSP and CartPole is which 5 functions are passed to `GeneticAlgorithm()`. The core loop in `ga_base.py` never changes.
+
+![h:470px](docs/slide_plugin.png)
+
+---
+
+<!-- _style: "section { font-size: 0.78em; }" -->
+
+## Pseudocode — GA Algorithm
+
+![h:490px](docs/slide_pseudocode.png)
+
+---
+
+<!-- _style: "section { font-size: 0.88em; }" -->
+
+## Task 1: TSP — Representation & Fitness
+
+**Chromosome:** integer permutation — e.g. `[2, 0, 4, 1, 3]` = route city2→city0→city4→city1→city3→city2
+
+**Combined fitness function:**
+$$f = \frac{1}{d + \varepsilon} \times \left(1 + w_s \cdot \frac{1}{1 + CV}\right)$$
+
+where $d$ = total Euclidean round-trip distance, $CV$ = coefficient of variation of segment lengths (rewards balanced routes), $w_s = 0.2$.
+
+**Default config:** pop=80, gen=300, crossover=OX, mutation=inversion (rate=0.10), tournament k=4, elites=2, patience=25
+
+---
+
+## Task 1: TSP — Before vs After
 
 <div class="columns">
 <div>
 
-![w:500px](results/task1/fitness_history.png)
-
-Fitness converges quickly in the first ~50 generations and stabilises around the near-optimal solution.
+![w:460px](results/task1/initial_route.png)
+**Initial:** random permutation, distance ≈ 6–8
 
 </div>
 <div>
 
 ![w:460px](results/task1/best_route.png)
-
-**Best route distance: 3.43**
-Theoretical optimum ≈ 3.1 — within ~10% of optimal.
+**After GA:** distance = **3.43** (optimum ≈ 3.1, within 10%)
 
 </div>
 </div>
 
 ---
 
-## Task 1: TSP — Operator Comparison
-
-![w:820px](results/task1/comparison_operators.png)
-
-All four operator combinations converge to a similar quality. **Inversion+OX** is the default choice — good balance of exploration and exploitation.
-
----
-
-## Task 1: TSP — Population Size Comparison
-
-![w:820px](results/task1/comparison_population_size.png)
-
-All population sizes reach similar final fitness. Larger populations show more stable convergence curves but require more computation per generation.
-
----
-
-<!-- _style: "section { font-size: 0.85em; }" -->
-
-## Task 2: CartPole — Algorithm
-
-**Environment:** 4D observation `[cart_pos, cart_vel, pole_angle, pole_angular_vel]`
-**Action:** push left (0) or push right (1) · **Max reward: 500**
-
-**Linear policy (chromosome = 5 real numbers):**
-
-$$\text{action} = \begin{cases} 1 & \text{if } w_0 \cdot \text{pos} + w_1 \cdot \text{vel} + w_2 \cdot \theta + w_3 \cdot \dot\theta + b > 0 \\ 0 & \text{otherwise} \end{cases}$$
-
-**Fitness:** mean total reward over 5 independent episodes.
-
-**Default configuration:**
-
-| pop | generations | crossover | mutation | elites | episodes/eval |
-|-----|-------------|-----------|----------|--------|---------------|
-| 50  | 100         | Uniform   | Gaussian σ=0.3, rate=0.10 | 2 | 5 |
-
----
-
-## Task 2: CartPole — Results
-
-![w:750px](results/task2/reward_history.png)
-
-**Maximum reward (500) reached at generation 10.** The linear policy is sufficient to fully solve CartPole-v1. Agent video saved to `results/task2/agent.mp4`.
-
----
-
-## Task 2: CartPole — Sigma Comparison
-
-![w:820px](results/task2/comparison_sigma.png)
-
-All three sigma values eventually reach reward 500. Smaller σ converges more smoothly; larger σ shows higher variance but can escape local optima faster.
-
----
-
-## Task 2: CartPole — Population & Episodes Comparison
+## Task 1: TSP — Convergence & Operator Comparison
 
 <div class="columns">
 <div>
 
-![w:500px](results/task2/comparison_population_size.png)
-
-Larger populations start with better initial diversity — `pop=100` hits reward 500 within the first few generations.
+![w:500px](results/task1/fitness_history.png)
+Dual axis: fitness (left) + distance (right). Fitness stabilises after ~50 generations.
 
 </div>
 <div>
 
-![w:500px](results/task2/comparison_eval_episodes.png)
-
-More evaluation episodes reduce fitness noise, leading to smoother and more reliable convergence.
+![w:500px](results/task1/comparison_operators.png)
+All operator combinations reach similar quality. **Inversion+OX** converges most reliably.
 
 </div>
 </div>
 
 ---
 
-<!-- _style: "section { font-size: 0.84em; }" -->
+<!-- _style: "section { font-size: 0.88em; }" -->
+
+## Task 2: CartPole — Representation & Policy
+
+**Chromosome:** `[w₀, w₁, w₂, w₃, bias]` — 5 real numbers
+
+**Linear policy:**
+$$\text{action} = \begin{cases} 1 & \text{if } w_0 \cdot \text{pos} + w_1 \cdot \text{vel} + w_2 \cdot \theta + w_3 \cdot \dot\theta + b > 0 \\ 0 & \text{otherwise} \end{cases}$$
+
+**Stability-penalised fitness:**
+$$f = \bar{r} - 0.05 \cdot \sigma_r$$
+
+Penalising reward variance selects policies that are consistently good — not just occasionally lucky.
+
+**Default config:** pop=50, gen=100, crossover=uniform, mutation=gaussian σ=0.3, 5 episodes/eval, patience=15
+
+---
+
+## Task 2: CartPole — Before vs After
+
+<div class="columns">
+<div>
+
+![w:490px](results/task2/initial/control.png)
+**Random policy:** pole falls in ~10 steps
+
+</div>
+<div>
+
+![w:490px](results/task2/trained/control.png)
+**Trained policy:** survives all **500 steps**, angle near 0°
+
+</div>
+</div>
+
+---
+
+## Task 2: CartPole — Convergence & Sigma Comparison
+
+<div class="columns">
+<div>
+
+![w:500px](results/task2/reward_history.png)
+Reward = **500** (maximum) reached at **generation 10**.
+
+</div>
+<div>
+
+![w:500px](results/task2/comparison_sigma.png)
+All σ values converge. Smaller σ is smoother; larger σ has higher initial variance.
+
+</div>
+</div>
+
+---
 
 ## Conclusions
 
 ### Task 1 — TSP ✅
-- GA reduces route distance from ~6 (random) to **3.43** — within 10% of the theoretical optimum (~3.1)
-- All operator combinations perform similarly; **OX + inversion** is the most consistent choice
+- GA reduces route distance from **~6–8** (random) to **3.43** — within **10%** of theoretical optimum
+- OX + inversion is the most consistent operator combination
+- Smoothness bonus in fitness discourages zigzagging routes
 
 ### Task 2 — CartPole ✅
-- GA discovers a working **linear policy** in just **10 generations**
-- Best agent achieves **reward = 500/500** every episode (maximum possible)
-- CartPole-v1 is linearly solvable — a 5-parameter chromosome is sufficient
+- GA finds a working **linear policy** in just **10 generations**
+- Best agent achieves **reward = 500/500** every episode
+- Stability penalty in fitness selects for robust, consistent policies
 
----
-
-<!-- _class: lead -->
-
-## Key Takeaway
-
-A single generic GA framework with **pluggable operators** handles both discrete (permutation) and continuous (real-valued) optimisation problems effectively.
+### Architecture
+- **One generic GA, any domain** — add a new problem by implementing 5 functions only
+- Adaptive mutation (boost) and parallel evaluation added after reviewer feedback
 
 ---
 
@@ -439,15 +280,6 @@ A single generic GA framework with **pluggable operators** handles both discrete
 
 # Thank You
 
-**Repository:** github.com/piotrek1459/biai-genetic-cartpole
-
-```bash
-# Run TSP
-python3 -m src.task1_tsp.tsp_ga
-
-# Run CartPole
-python3 -m src.task2_cartpole.train_ga
-python3 -m src.task2_cartpole.evaluate
-```
+**Repository:** [github.com/piotrek1459/biai-genetic-cartpole](https://github.com/piotrek1459/biai-genetic-cartpole)
 
 Piotr Krupiński · Jeremi Szczotka

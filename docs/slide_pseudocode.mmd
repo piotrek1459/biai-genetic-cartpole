@@ -1,5 +1,9 @@
 flowchart TD
-    START([START]) --> INIT
+    PLUGIN_BOX["GeneticAlgorithm(config,\ninit_fn, fitness_fn,\ncrossover_fn, mutation_fn, selection_fn)\n── PLUGIN INTERFACE ──\nTSP: permutation ops  |  CartPole: real-valued ops  |  Task N: any domain"]
+    style PLUGIN_BOX fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a5f
+
+    PLUGIN_BOX --> START([START])
+    START --> INIT
 
     subgraph INIT_BLOCK ["INITIALISE"]
         INIT["population ← init_fn(config)\nbest_so_far ← -∞\nstagnation_count ← 0"]
